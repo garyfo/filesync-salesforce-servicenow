@@ -1,0 +1,4 @@
+%dw 2.0
+
+type auto_7db3a98e_4149_453a_890e_504a354cafee_Input_Variables_response = Array<Nothing>
+

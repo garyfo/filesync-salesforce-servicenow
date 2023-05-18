@@ -1,0 +1,23 @@
+%dw 2.0
+
+type auto_9d673511_ba4f_47ce_a5bb_3de36c8b4b10_Output_Attributes = {|
+  clientCertificate?: {|
+    publicKey?: {|  |}, 
+    "type"?: String, 
+    encoded?: Binary
+  |}, 
+  headers: {|  |}, 
+  listenerPath: String, 
+  method: String, 
+  queryParams: {|  |}, 
+  queryString: String, 
+  relativePath: String, 
+  remoteAddress: String, 
+  requestPath: String, 
+  requestUri: String, 
+  scheme: String, 
+  uriParams: {| servicenowID: String |}, 
+  version: String, 
+  localAddress: String
+|}
+

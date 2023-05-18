@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<flow name="delete-sn-files" doc:id="719b340c-15c4-4716-a5ab-63a8e464fbe7" >
+		<flow-ref doc:name="Get ServiceNow's file list" doc:id="1d5d891a-3f06-4608-adb1-671762704964" name="get-sn-files-list" />
+		<foreach doc:name="For Each" doc:id="d925cc2a-2d16-4cad-a987-32f61902dcf0" collection="#[payload.result]">
+			<http:request method="DELETE" doc:name="Delete file" doc:id="a47cfd27-4e6f-43ad-b287-087af32eaa59" config-ref="servicenow-requester" path="attachment/{ID}">
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"ID" : payload.sys_id
+}]]]></http:uri-params>
+		</http:request>
+		</foreach>
+	</flow>
+	<flow name="post-sn-files" doc:id="28af7e41-d12c-4e6e-a9ab-8d8fc8f53e37" >
+		<foreach doc:name="For Each" doc:id="31b8f341-4f40-4a1e-86af-955f48787df6" collection="#[payload]">
+			<http:request method="POST" doc:name="Post files" doc:id="5d3f358b-1c6a-471c-bda5-edc2b83e6c80" config-ref="servicenow-requester" path="attachment/file">
+			<http:body><![CDATA[#[payload.data]]]></http:body>
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"table_sys_id" : vars.sysId,
+	"file_name" : payload.fileName,
+	"table_name" : Mule::p('servicenow.table')
+}]]]></http:query-params>
+		</http:request>
+		</foreach>
+	</flow>
+	<flow name="get-sn-files" doc:id="c2820f1b-cce9-486a-a890-c16f5234bc7c" >
+		<set-variable value="#[[]]" doc:name="response" doc:id="5f8ccc7b-dd88-404d-a7d2-12999ca82d7f" variableName="response"/>
+		<flow-ref doc:name="Get ServiceNow's file list" doc:id="d2a7821d-35c5-4c74-be1d-fef32eae72c0" name="get-sn-files-list"/>
+		<foreach doc:name="For Each" doc:id="c4373b13-ac2e-4f39-acee-5d8dbedf1174" collection="#[payload.result]" >
+			<set-variable value="#[payload.file_name]" doc:name="fileName" doc:id="a5a0a86c-b349-4b3a-8502-c53e308c8b3d" variableName="fileName" />
+			<set-variable value="#[payload.sys_id]" doc:name="fileId" doc:id="4638bbeb-09e2-4d88-9bf7-14c4c375104b" variableName="fileId" />
+			<http:request method="GET" doc:name="Get file" doc:id="72ef871b-5c47-4572-9fda-732e81a8ebae" config-ref="servicenow-requester" path="attachment/{ID}/file" >
+				<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"ID" : vars.fileId
+}]]]></http:uri-params>
+				<http:query-params ><![CDATA[#[output application/java
+---
+{
+	"ID" : vars.fileId
+}]]]></http:query-params>
+			</http:request>
+			<ee:transform doc:name="Format response" doc:id="e5f008a9-1b69-49ff-ab85-adfc05704bf4" >
+				<ee:message >
+				</ee:message>
+				<ee:variables >
+					<ee:set-variable variableName="response" ><![CDATA[%dw 2.0
+output application/java
+---
+vars.response << {
+	fileName: vars.fileName,
+	data: payload
+}]]></ee:set-variable>
+				</ee:variables>
+			</ee:transform>
+		</foreach>
+		<set-payload value="#[vars.response]" doc:name="Set Payload" doc:id="a3e1cdb5-3dd4-4ad4-9e03-0f195c66a62a" />
+	</flow>
+	<flow name="get-sn-files-list" doc:id="7db3a98e-4149-453a-890e-504a354cafee" >
+		<http:request method="GET" doc:name="Get files" doc:id="394f9d2a-0a19-4e64-9209-3973887f26f6" config-ref="servicenow-requester" path="attachment">
+			<http:query-params><![CDATA[#[output application/java
+---
+{
+	"sysparm_query" : "table_name=${servicenow.table}^table_sys_id=" ++ vars.sysId
+}]]]></http:query-params>
+		</http:request>
+	</flow>
+</mule>

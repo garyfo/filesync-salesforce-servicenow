@@ -1,0 +1,13 @@
+http:
+  port: "8081"
+salesforce:
+  username: ""
+  password: ""
+  token: ""
+  objectType: "Case"
+  externalAttribute: "Motif_du_ticket__c"
+servicenow:
+  username: ""
+  password: ""
+  host: ""
+  table: "incident"

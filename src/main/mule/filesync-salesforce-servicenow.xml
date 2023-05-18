@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+    <http:listener-config name="filesync-salesforce-servicenow-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="${http.port}"/>
+    </http:listener-config>
+    <apikit:config name="filesync-salesforce-servicenow-config" api="resource::c2860ab6-7609-435c-9d60-f68e555cc5b5:filesync-salesforce-servicenow:1.0.1:raml:zip:filesync-salesforce-servicenow.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <configuration-properties doc:name="Configuration properties" doc:id="becf434a-bad0-4c05-9255-71e71ef59d27" file="prop.yaml" />
+	<salesforce:sfdc-config name="salesforce-config" doc:name="Salesforce Config" doc:id="0ef27f23-2e65-4fa9-b8dd-682e574d5ff5" >
+		<salesforce:basic-connection username="${salesforce.username}" password="${salesforce.password}" securityToken="${salesforce.token}" />
+	</salesforce:sfdc-config>
+	<http:request-config name="servicenow-requester" doc:name="HTTP Request configuration" doc:id="ad577f69-becd-45a8-baf6-f7c8f6c9e9e0" basePath="api/now" >
+		<http:request-connection host="${servicenow.host}" protocol="HTTPS">
+			<http:authentication >
+				<http:basic-authentication username="${servicenow.username}" password="${servicenow.password}" />
+			</http:authentication>
+		</http:request-connection>
+	</http:request-config>
+	<flow name="filesync-salesforce-servicenow-main">
+        <http:listener config-ref="filesync-salesforce-servicenow-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="filesync-salesforce-servicenow-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="filesync-salesforce-servicenow-console">
+        <http:listener config-ref="filesync-salesforce-servicenow-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="filesync-salesforce-servicenow-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="post:\incidents\(servicenowID)\sync-file-to-salesforce:filesync-salesforce-servicenow-config">
+		<set-variable value="#[attributes.uriParams.servicenowID]" doc:name="sysId" doc:id="e6a09702-9727-4b85-ae7c-1a2ab1d75847" variableName="sysId"/>
+		<flow-ref doc:name="Get Salesforce's internal id" doc:id="8847197e-b655-4eb0-818a-8ffec5e7bbe6" name="get-sf-object-id" target="salesforceObjectId"/>
+		<flow-ref doc:name="Delete Salesforce's files" doc:id="5f85545c-7773-44b2-8e40-d85a187246da" name="delete-sf-files"/>
+		<flow-ref doc:name="Get ServiceNow's files" doc:id="0d5341e9-263a-4b61-9761-9d304cf0f539" name="get-sn-files"/>
+		<flow-ref doc:name="Post files to Salesforce" doc:id="280988ba-923b-4fdc-aea4-cd902c9fa945" name="post-sf-files"/>
+		<ee:transform doc:name="response" doc:id="eaac8bc0-b8a2-485b-b710-461bf8fbc92a" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Sync to Salesforce successful"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="post:\cases\(salesforceID)\sync-file-to-service-now\:filesync-salesforce-servicenow-config">
+		<set-variable value="#[attributes.uriParams.salesforceID]" doc:name="salesforceObjectId" doc:id="9d4a4d0e-aa62-4cfb-aeed-be45fb0df0f1" variableName="salesforceObjectId"/>
+		<flow-ref doc:name="Get serviceNow's internal id" doc:id="4f33e7ed-1836-4098-8d46-a66cdf102acc" name="get-sn-object-id" target="sysId"/>
+		<flow-ref doc:name="Delete ServiceNow's files" doc:id="616772e0-8914-4f90-9841-bf6e8efa1400" name="delete-sn-files" />
+		<flow-ref doc:name="Get Salesforce's files" doc:id="7f37758a-5fbe-4330-a082-e2a0e5367750" name="get-sf-files" />
+		<flow-ref doc:name="Post files to ServiceNow" doc:id="151c0ed6-7765-4c36-b8b6-800bff4d924e" name="post-sn-files" />
+		<ee:transform doc:name="response" doc:id="8504d976-7ab3-4cc8-b2c6-8f077acb6508" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	message: "Sync to ServiceNow successful"
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+</mule>

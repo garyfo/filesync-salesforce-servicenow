@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd 
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+	<flow name="post-sf-files" doc:id="04f8e6a2-54d6-4827-9951-3b55f44cfe29" >
+		<ee:transform doc:name="Transform Message" doc:id="c9908abe-227a-4789-a0cb-552659f73a8b">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+payload map {
+    PathOnClient: $.fileName,
+    VersionData: $.data as Binary {
+        class: "byte[]"
+    }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert objectType="ContentVersion" externalIdFieldName="Id" doc:name="Upload files" doc:id="5fed251d-4761-4e32-83d1-6cb688d47c64" config-ref="salesforce-config" />
+		<ee:transform doc:name="Format Ids" doc:id="ceba86b7-d6e6-47ab-bf09-8d7902fc2b5c" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload.items.Id joinBy "','"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:query doc:name="Get Content Document Id" doc:id="d79ff807-c7cb-4a67-94db-826393a50a72" config-ref="salesforce-config">
+				<salesforce:salesforce-query><![CDATA[SELECT ContentDocumentId FROM ContentVersion WHERE Id IN (':cvId')]]></salesforce:salesforce-query>
+				<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"cvId" : payload
+}]]]></salesforce:parameters>
+			</salesforce:query>
+		<ee:transform doc:name="Map document link" doc:id="4155bd6d-3495-4e0f-84f1-37c323b08d37">
+				<ee:message>
+					<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+payload.ContentDocumentId map {
+LinkedEntityId: vars.salesforceObjectId,
+ContentDocumentId: $
+}]]></ee:set-payload>
+				</ee:message>
+			</ee:transform>
+		<salesforce:upsert doc:name="Create content document link" doc:id="bcabe630-ed7a-4ebe-b055-69b2dd085a1a" config-ref="salesforce-config" objectType="ContentDocumentLink" externalIdFieldName="Id">
+			</salesforce:upsert>
+	</flow>
+	<flow name="get-sf-files" doc:id="64611170-e78c-42d7-9834-8eb5af569db7">
+		<salesforce:query doc:name="Get files list" doc:id="03658d8f-a837-49d3-b3dd-4a8c90c8dd98" config-ref="salesforce-config">
+			<salesforce:salesforce-query><![CDATA[Select ContentDocumentId from ContentDocumentLink where LinkedEntityId in (':id')
+]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : vars.salesforceObjectId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Format Ids" doc:id="781a4490-4867-47b9-8280-caba656f3d99">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload.ContentDocumentId joinBy "','"]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:query doc:name="Get files list" doc:id="95fbe296-cd75-4479-be5a-5b10eaeed7bb" config-ref="salesforce-config">
+			<salesforce:salesforce-query><![CDATA[select Id from ContentVersion where ContentDocumentId in (':id')]]></salesforce:salesforce-query>
+			<salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : payload
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Prepare request" doc:id="0f9a0cba-4340-474f-93d2-9de7a77bdb1a">
+                <ee:message>
+                    <ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+{
+fields: ['PathOnClient,VersionData'],
+ids: payload.Id
+}]]></ee:set-payload>
+                </ee:message>
+            </ee:transform>
+		<choice doc:name="Choice" doc:id="955ceb00-2825-4bcc-bbdd-9f30f4d77a5d" >
+			<when expression="#[!isEmpty(payload.ids)]">
+				<salesforce:retrieve type="ContentVersion" doc:name="Get files" doc:id="1306f3da-640f-46b9-9b68-33d27d8c83bd" config-ref="salesforce-config" />
+				<ee:transform doc:name="Cast files to binary" doc:id="b81ce54b-4cdb-47c7-85ae-e99c291a2889">
+                <ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+import * from dw::core::Binaries
+output application/java
+---
+payload map {
+    data: fromBase64($.VersionData as String) as Binary,
+    fileName: $.PathOnClient
+}]]></ee:set-payload>
+			</ee:message>
+                <ee:variables>
+                </ee:variables>
+            </ee:transform>
+			</when>
+			<otherwise >
+				<set-payload value="#[[]]" doc:name="Set Payload" doc:id="2d2e79c8-7503-4349-86db-71a74b38d2f3" />
+			</otherwise>
+		</choice>
+	</flow>
+	<flow name="delete-sf-files" doc:id="0cf41755-fea8-450d-bc2f-646445d9b2a0" >
+		<salesforce:query doc:name="Get files list" doc:id="0662ade0-3954-476b-93bc-da41c5e98ecd" config-ref="salesforce-config">
+            <salesforce:salesforce-query><![CDATA[SELECT ContentDocumentId FROM ContentDocumentLink WHERE LinkedEntityId = ':id'
+]]></salesforce:salesforce-query>
+            <salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : vars.salesforceObjectId
+}]]]></salesforce:parameters>
+        </salesforce:query>
+		<choice doc:name="Choice" doc:id="4f8769e7-27c7-4264-8d55-337f2a40fcfe" >
+			<when expression="#[!isEmpty(payload.ContentDocumentId)]">
+				<salesforce:delete doc:name="Delete" doc:id="2d56ea13-5713-4f5b-8457-b3b71098d5be" config-ref="salesforce-config">
+			<salesforce:ids><![CDATA[#[payload.ContentDocumentId]]]></salesforce:ids>
+		</salesforce:delete>
+			</when>
+		</choice>
+	</flow>
+	<flow name="get-sn-object-id" doc:id="a5504f42-4030-491c-a81a-0b8c02886a42" >
+		<salesforce:query doc:name="Get ServiceNow's object id" doc:id="86d2b991-5978-449c-bebf-39b01e7808a1" config-ref="salesforce-config">
+            <salesforce:salesforce-query><![CDATA[select :externalAttribute from :objectType where Id = ':id']]></salesforce:salesforce-query>
+            <salesforce:parameters><![CDATA[#[output application/java
+---
+{
+	"id" : vars.salesforceObjectId,
+	"objectType" : Mule::p('salesforce.objectType'),
+	"externalAttribute": Mule::p('salesforce.externalAttribute')
+}]]]></salesforce:parameters>
+        </salesforce:query>
+		<set-payload value="#[payload.Motif_du_ticket__c[0]]" doc:name="Set Payload" doc:id="133e9892-f19f-4586-a3f4-fb431543e1d4" />
+	</flow>
+	<flow name="get-sf-object-id" doc:id="9d673511-ba4f-47ce-a5bb-3de36c8b4b10" >
+		<salesforce:query doc:name="Get Salesforce's object id" doc:id="3eb370a5-0818-460f-bb01-2ca90b25a65b" config-ref="salesforce-config">
+			<salesforce:salesforce-query ><![CDATA[select Id from Case where :externalAttribute = ':id']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	"externalAttribute" : Mule::p('salesforce.externalAttribute'),
+	"id" : vars.sysId
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<set-payload value="#[payload.Id[0]]" doc:name="Set Payload" doc:id="33966cf2-85d6-4f66-ac88-bff97a8319f0" />
+	</flow>
+</mule>

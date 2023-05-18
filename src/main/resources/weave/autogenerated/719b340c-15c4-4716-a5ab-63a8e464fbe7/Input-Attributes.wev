@@ -1,0 +1,23 @@
+%dw 2.0
+
+type auto_719b340c_15c4_4716_a5ab_63a8e464fbe7_Input_Attributes = {|
+  clientCertificate?: {|
+    publicKey?: {|  |}, 
+    "type"?: String, 
+    encoded?: Binary
+  |}, 
+  headers: {|  |}, 
+  listenerPath: String, 
+  method: String, 
+  queryParams: {|  |}, 
+  queryString: String, 
+  relativePath: String, 
+  remoteAddress: String, 
+  requestPath: String, 
+  requestUri: String, 
+  scheme: String, 
+  uriParams: {| salesforceID: String |}, 
+  version: String, 
+  localAddress: String
+|}
+

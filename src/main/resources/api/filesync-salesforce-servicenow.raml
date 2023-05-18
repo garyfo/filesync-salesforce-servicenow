@@ -1,0 +1,34 @@
+#%RAML 1.0
+title: filesync-salesforce-servicenow-xapi
+description: Sync files between Salesforces & ServiceNow
+
+securitySchemes:
+  basic:
+    type: basic
+securedBy:
+  - basic
+
+/cases:
+  /{salesforceID}:
+    /sync-file-to-service-now/:
+      post:
+        description: Get files from a Salesforce case using its internal id, then send it to the matching serviceNow's incident
+        responses:
+          200:
+          400:
+          401:
+          404:
+          500:
+
+    
+/incidents:
+  /{servicenowID}:
+    /sync-file-to-salesforce:
+      post:
+        description: Get files from a ServiceNow incident using its system id, and then send it to the matching Salesforce's case
+        responses:
+          200:
+          400:
+          401:
+          404:
+          500:
